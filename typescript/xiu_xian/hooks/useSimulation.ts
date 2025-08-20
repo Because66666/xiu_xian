@@ -86,7 +86,7 @@ export function useSimulation() {
   const processBattles = useCallback((cultivators: Cultivator[], absorptionRate: number): { cultivators: Cultivator[], battles: number, deaths: number } => {
     let yearlyBattles = 0
     let yearlyDeaths = 0
-    const aliveCultivators = cultivators.filter(c => c.is_alive)
+    const aliveCultivators = [...cultivators] // 所有修士都是活着的，因为死亡的已经被分离存储
 
     // 按等级分组
     const levelGroups: Record<number, Cultivator[]> = {}
@@ -101,6 +101,7 @@ export function useSimulation() {
       const encounterProbability = levelCultivators.length / totalCultivators
 
       levelCultivators.forEach((cultivator) => {
+        // 检查修士是否已经在本年死亡
         if (!cultivator.is_alive) return
 
         if (Math.random() < encounterProbability * BATTLE_PARAMS.encounterProbabilityMultiplier) {
@@ -119,12 +120,14 @@ export function useSimulation() {
                 const absorbedPower = Math.floor(opponent.cultivation_points * absorptionRate)
                 cultivator.cultivation_points += absorbedPower
                 cultivator.defeats_count++
+                // 将死亡的对手标记为死亡
                 opponent.is_alive = false
                 yearlyDeaths++
               } else {
                 const absorbedPower = Math.floor(cultivator.cultivation_points * absorptionRate)
                 opponent.cultivation_points += absorbedPower
                 opponent.defeats_count++
+                // 将死亡的修士标记为死亡
                 cultivator.is_alive = false
                 yearlyDeaths++
               }
@@ -134,8 +137,11 @@ export function useSimulation() {
       })
     })
 
+    // 返回活着的修士（排除本年死亡的）
+    const survivingCultivators = aliveCultivators.filter(c => c.is_alive)
+    
     return {
-      cultivators: cultivators.filter((c) => c.is_alive),
+      cultivators: survivingCultivators,
       battles: yearlyBattles,
       deaths: yearlyDeaths
     }
@@ -178,8 +184,8 @@ export function useSimulation() {
   }, [])
 
   // 追踪最强修士和杀戮之王变化
-  const trackChanges = useCallback((cultivators: Cultivator[], currentSimYear: number, prevData: SimulationData | null) => {
-    const aliveCultivators = cultivators.filter(c => c.is_alive)
+  const trackChanges = useCallback((cultivators: Cultivator[], prevData: SimulationData | null, currentSimYear: number, battles: number, deaths: number) => {
+    const aliveCultivators = cultivators // 传入的cultivators已经是活着的修士
     if (aliveCultivators.length === 0) return
 
     const currentStrongest = aliveCultivators.reduce((strongest, current) => 
@@ -249,7 +255,7 @@ export function useSimulation() {
       return
     }
 
-    const prevAliveCultivators = prevData.cultivators.filter(c => c.is_alive)
+    const prevAliveCultivators = prevData.cultivators // prevData.cultivators已经是活着的修士
     if (prevAliveCultivators.length === 0) return
 
     const prevStrongest = prevAliveCultivators.reduce((strongest, current) => 
@@ -287,10 +293,10 @@ export function useSimulation() {
         // 前任还活着，比较修为
         const currentPrevStrongest = aliveCultivators.find(c => c.id === prevStrongest.id)!
         if (currentStrongest.cultivation_points > currentPrevStrongest.cultivation_points) {
-          reason = `修为超越前任最强修士（${currentStrongest.cultivation_points} > ${currentPrevStrongest.cultivation_points}）`
-          message = `最强修士更迭：修士${currentStrongest.id}修为突破，超越修士${prevStrongest.id}成为新的最强修士`
+          reason = `修为严格超越前任最强修士（${currentStrongest.cultivation_points} > ${currentPrevStrongest.cultivation_points}）`
+          message = `最强修士更迭：修士${currentStrongest.id}通过修炼突破，修为超越修士${prevStrongest.id}，成为新的最强修士`
         } else {
-          reason = `前任最强修士实力下降`
+          reason = `前任最强修士实力下降或其他修士实力提升`
           message = `最强修士更迭：修士${currentStrongest.id}取代修士${prevStrongest.id}成为新的最强修士`
         }
       }
@@ -345,10 +351,10 @@ export function useSimulation() {
         // 前任还活着，比较击败人数
         const currentPrevTopKiller = aliveCultivators.find(c => c.id === prevTopKiller.id)!
         if (currentTopKiller.defeats_count > currentPrevTopKiller.defeats_count) {
-          reason = `击败人数超越前任杀戮之王（${currentTopKiller.defeats_count} > ${currentPrevTopKiller.defeats_count}）`
-          message = `杀戮之王更迭：修士${currentTopKiller.id}击败更多对手，超越修士${prevTopKiller.id}成为新的杀戮之王`
+          reason = `击败人数严格超越前任杀戮之王（${currentTopKiller.defeats_count} > ${currentPrevTopKiller.defeats_count}）`
+          message = `杀戮之王更迭：修士${currentTopKiller.id}通过战斗积累更多胜利，击败人数超越修士${prevTopKiller.id}，成为新的杀戮之王`
         } else {
-          reason = `前任杀戮之王击败人数下降`
+          reason = `前任杀戮之王击败人数下降或其他修士击败人数提升`
           message = `杀戮之王更迭：修士${currentTopKiller.id}取代修士${prevTopKiller.id}成为新的杀戮之王`
         }
       }
@@ -382,6 +388,11 @@ export function useSimulation() {
 
     setIsRunning(true)
     let { cultivators, nextId, year } = simulationStateRef.current
+    
+    // 模拟状态恢复（不再需要恢复死亡修士数据）
+
+    // 使用局部 prevDataLocal：若已有历史数据，则取最后一条；否则为 null（仅第一次年份触发初代播报）
+    let prevDataLocal: SimulationData | null = simulationData[simulationData.length - 1] || null
 
     for (let currentSimYear = year; currentSimYear <= simulationYears; currentSimYear++) {
       if (shouldPauseRef.current) {
@@ -402,12 +413,17 @@ export function useSimulation() {
       // 更新等级
       cultivators = updateCultivatorLevels(cultivators)
 
-      // 移除寿命耗尽的修士
+      // 过滤出活着的修士（寿命耗尽的直接移除）
+      const expiredCount = cultivators.filter(c => c.age > c.max_lifespan).length
       cultivators = cultivators.filter((c) => c.age <= c.max_lifespan)
 
       // 处理战斗
       const battleResult = processBattles(cultivators, absorptionRate)
+      
       cultivators = battleResult.cultivators
+
+      // 计算总死亡数量
+      const totalDeaths = expiredCount + battleResult.deaths
 
       // 计算统计数据
       const { levelDistribution, levelStats } = calculateStats(cultivators)
@@ -417,19 +433,21 @@ export function useSimulation() {
         cultivators: [...cultivators],
         total_cultivators: cultivators.length,
         battles: battleResult.battles,
-        deaths: battleResult.deaths,
+        deaths: totalDeaths,
         level_distribution: levelDistribution,
         level_stats: levelStats,
       }
 
-      // 追踪变化
-      const prevData = simulationData[simulationData.length - 1] || null
-      trackChanges(cultivators, currentSimYear, prevData)
+      // 追踪变化（使用局部 prevDataLocal，确保初代播报只在整个运行的第一年触发一次）
+      trackChanges(cultivators, prevDataLocal, currentSimYear, battleResult.battles, totalDeaths)
       
       setSimulationData((prev) => [...prev, mockData])
 
       setCurrentYear(currentSimYear)
       setCurrentData(mockData)
+
+      // 更新局部上一年数据
+      prevDataLocal = mockData
 
       simulationStateRef.current = { cultivators, nextId, year: currentSimYear + 1 }
     }
@@ -437,7 +455,7 @@ export function useSimulation() {
     setIsRunning(false)
     setIsPaused(false)
     simulationStateRef.current = null
-  }, [simulationYears, absorptionRate, createNewCultivators, ageCultivators, updateCultivatorLevels, processBattles, calculateStats, trackChanges])
+  }, [simulationYears, absorptionRate, simulationData, createNewCultivators, ageCultivators, updateCultivatorLevels, processBattles, calculateStats, trackChanges])
 
   // 开始模拟
   const runSimulation = useCallback(async () => {

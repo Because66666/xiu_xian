@@ -1,4 +1,4 @@
-'use client'
+"use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -20,15 +20,30 @@ export function SystemLog({ logs }: SystemLogProps) {
     }
   }
 
-  const getLogTypeLabel = (type: string) => {
-    switch (type) {
-      case 'strongest_change':
-        return '最强更迭'
-      case 'killer_change':
-        return '杀王更迭'
-      default:
-        return '系统事件'
+  // 调整：基于日志内容进一步细分标签，区分初代/战斗/寿元/数值超越
+  const getLogTypeLabel = (log: SystemLogType) => {
+    const { type, message, reason } = log
+
+    // 初代播报
+    if (message.includes('初代最强修士')) return '初代最强'
+    if (message.includes('初代杀戮之王')) return '初代杀王'
+
+    // 更迭细分
+    if (type === 'strongest_change') {
+      if (message.includes('击杀') || (reason && reason.includes('击杀'))) return '最强更迭·战斗'
+      if (message.includes('寿元耗尽') || (reason && reason.includes('寿元耗尽'))) return '最强更迭·寿元'
+      if (message.includes('修为') && message.includes('超越')) return '最强更迭·数值超越'
+      return '最强更迭'
     }
+
+    if (type === 'killer_change') {
+      if (message.includes('击杀') || (reason && reason.includes('击杀'))) return '杀王更迭·战斗'
+      if (message.includes('寿元耗尽') || (reason && reason.includes('寿元耗尽'))) return '杀王更迭·寿元'
+      if ((message.includes('击败人数') && message.includes('超越')) || (reason && reason.includes('击败人数'))) return '杀王更迭·数值超越'
+      return '杀王更迭'
+    }
+
+    return '系统事件'
   }
 
   return (
@@ -48,7 +63,7 @@ export function SystemLog({ logs }: SystemLogProps) {
                 <div key={index} className="border rounded-lg p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <Badge className={getLogTypeColor(log.type)}>
-                      {getLogTypeLabel(log.type)}
+                      {getLogTypeLabel(log)}
                     </Badge>
                     <span className="text-sm text-muted-foreground">
                       第{log.year}年
