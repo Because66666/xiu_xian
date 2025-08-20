@@ -17,6 +17,9 @@ export function useSimulation() {
   // 引用状态
   const simulationStateRef = useRef<SimulationState | null>(null)
   const shouldPauseRef = useRef(false)
+  // 确保初代播报仅出现一次（每次运行生命周期内）
+  const hasReportedInitialStrongestRef = useRef(false)
+  const hasReportedInitialKillerRef = useRef(false)
 
   // 创建新修士
   const createNewCultivators = useCallback((currentSimYear: number, nextId: number): { cultivators: Cultivator[], newNextId: number } => {
@@ -205,10 +208,11 @@ export function useSimulation() {
           log.newCultivator?.id === currentStrongest.id
         )
         
-        if (alreadyReported) {
+        if (hasReportedInitialStrongestRef.current || alreadyReported) {
           return prev
         }
         
+        hasReportedInitialStrongestRef.current = true
         return [...prev, {
           year: currentSimYear,
           type: 'strongest_change',
@@ -233,10 +237,11 @@ export function useSimulation() {
             log.newCultivator?.id === currentTopKiller.id
           )
           
-          if (alreadyReported) {
+          if (hasReportedInitialKillerRef.current || alreadyReported) {
             return prev
           }
           
+          hasReportedInitialKillerRef.current = true
           return [...prev, {
             year: currentSimYear,
             type: 'killer_change',
@@ -464,6 +469,9 @@ export function useSimulation() {
     setCurrentYear(0)
     setSimulationData([])
     setSystemLogs([])
+    // 重置初代播报标记
+    hasReportedInitialStrongestRef.current = false
+    hasReportedInitialKillerRef.current = false
     shouldPauseRef.current = false
 
     const cultivators: Cultivator[] = []
@@ -499,6 +507,9 @@ export function useSimulation() {
     setCurrentYear(0)
     setSimulationData([])
     setCurrentData(null)
+    // 重置初代播报标记
+    hasReportedInitialStrongestRef.current = false
+    hasReportedInitialKillerRef.current = false
     simulationStateRef.current = null
   }, [])
 
