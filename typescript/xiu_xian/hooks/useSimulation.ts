@@ -191,34 +191,60 @@ export function useSimulation() {
 
     // 如果是第一年，记录初始状态
     if (!prevData) {
-      setSystemLogs(prev => [...prev, {
-        year: currentSimYear,
-        type: 'strongest_change',
-        message: `修仙世界开启：修士${currentStrongest.id}成为初代最强修士`,
-        newCultivator: {
-          id: currentStrongest.id,
-          name: `修士${currentStrongest.id}`,
-          level: CultivationLevels[currentStrongest.level as keyof typeof CultivationLevels]?.name || '未知',
-          cultivation_points: currentStrongest.cultivation_points,
-          defeats_count: currentStrongest.defeats_count
-        },
-        reason: '修仙世界初始化'
-      }])
+      setSystemLogs(prev => {
+        // 检查是否已经播报过相同的初代最强修士
+        const alreadyReported = prev.some(log => 
+          log.type === 'strongest_change' && 
+          log.message.includes('成为初代最强修士') &&
+          log.newCultivator?.id === currentStrongest.id
+        )
+        
+        if (alreadyReported) {
+          return prev
+        }
+        
+        return [...prev, {
+          year: currentSimYear,
+          type: 'strongest_change',
+          message: `修仙世界开启：修士${currentStrongest.id}成为初代最强修士`,
+          newCultivator: {
+            id: currentStrongest.id,
+            name: `修士${currentStrongest.id}`,
+            level: CultivationLevels[currentStrongest.level as keyof typeof CultivationLevels]?.name || '未知',
+            cultivation_points: currentStrongest.cultivation_points,
+            defeats_count: currentStrongest.defeats_count
+          },
+          reason: '修仙世界初始化'
+        }]
+      })
       
       if (currentTopKiller.defeats_count > 0) {
-        setSystemLogs(prev => [...prev, {
-          year: currentSimYear,
-          type: 'killer_change',
-          message: `修士${currentTopKiller.id}成为初代杀戮之王`,
-          newCultivator: {
-            id: currentTopKiller.id,
-            name: `修士${currentTopKiller.id}`,
-            level: CultivationLevels[currentTopKiller.level as keyof typeof CultivationLevels]?.name || '未知',
-            cultivation_points: currentTopKiller.cultivation_points,
-            defeats_count: currentTopKiller.defeats_count
-          },
-          reason: `首次击败${currentTopKiller.defeats_count}人`
-        }])
+        setSystemLogs(prev => {
+          // 检查是否已经播报过相同的初代杀戮之王
+          const alreadyReported = prev.some(log => 
+            log.type === 'killer_change' && 
+            log.message.includes('成为初代杀戮之王') &&
+            log.newCultivator?.id === currentTopKiller.id
+          )
+          
+          if (alreadyReported) {
+            return prev
+          }
+          
+          return [...prev, {
+            year: currentSimYear,
+            type: 'killer_change',
+            message: `修士${currentTopKiller.id}成为初代杀戮之王`,
+            newCultivator: {
+              id: currentTopKiller.id,
+              name: `修士${currentTopKiller.id}`,
+              level: CultivationLevels[currentTopKiller.level as keyof typeof CultivationLevels]?.name || '未知',
+              cultivation_points: currentTopKiller.cultivation_points,
+              defeats_count: currentTopKiller.defeats_count
+            },
+            reason: `首次击败${currentTopKiller.defeats_count}人`
+          }]
+        })
       }
       return
     }
@@ -291,7 +317,7 @@ export function useSimulation() {
       }])
     }
 
-    // 杀戮之王变化
+    // 杀戮之王变化 - 只有当ID真正发生变化时才播报
     if (currentTopKiller.id !== prevTopKiller.id && currentTopKiller.defeats_count > 0) {
       // 检查前任杀戮之王是否还活着
       const prevTopKillerStillAlive = aliveCultivators.find(c => c.id === prevTopKiller.id)
@@ -399,10 +425,11 @@ export function useSimulation() {
       // 追踪变化
       const prevData = simulationData[simulationData.length - 1] || null
       trackChanges(cultivators, currentSimYear, prevData)
+      
+      setSimulationData((prev) => [...prev, mockData])
 
       setCurrentYear(currentSimYear)
       setCurrentData(mockData)
-      setSimulationData((prev) => [...prev, mockData])
 
       simulationStateRef.current = { cultivators, nextId, year: currentSimYear + 1 }
     }
@@ -410,7 +437,7 @@ export function useSimulation() {
     setIsRunning(false)
     setIsPaused(false)
     simulationStateRef.current = null
-  }, [simulationYears, absorptionRate, createNewCultivators, ageCultivators, updateCultivatorLevels, processBattles, calculateStats, trackChanges, simulationData])
+  }, [simulationYears, absorptionRate, createNewCultivators, ageCultivators, updateCultivatorLevels, processBattles, calculateStats, trackChanges])
 
   // 开始模拟
   const runSimulation = useCallback(async () => {
