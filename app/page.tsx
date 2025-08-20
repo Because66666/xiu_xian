@@ -65,7 +65,7 @@ export default function CultivationSimulator() {
             <p className="text-muted-foreground">体验修仙世界的残酷与辉煌，见证修士们的成长与陨落</p>
           </div>
           <a 
-            href="https://github.com" 
+            href="https://github.com/Because66666/xiu_xian" 
             target="_blank" 
             rel="noopener noreferrer"
             className="absolute top-6 right-4 p-2 rounded-full hover:bg-muted/50 transition-colors"
