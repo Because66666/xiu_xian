@@ -44,7 +44,7 @@ export function LevelDistributionChart({ data, currentYear }: LevelDistributionC
               <YAxis />
               <ChartTooltip
                 content={<ChartTooltipContent />}
-                formatter={(value, name) => [value, "修士数量"]}
+                formatter={(value) => [value, "修士数量"]}
                 labelFormatter={(label) => `${label}`}
               />
               <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} maxBarSize={60} />

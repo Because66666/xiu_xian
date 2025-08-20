@@ -7,12 +7,10 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts"
-import { Play, Pause, RotateCcw, Sword, Crown, Users, TrendingUp, Github } from "lucide-react"
+import { Play, Pause, RotateCcw, Sword, Crown, TrendingUp, Github } from "lucide-react"
 import { useSimulation } from "@/hooks/useSimulation"
 import { CultivationLevels } from "@/constants/cultivation"
-import { getCurrentStats, getSampledChartData, getLevelDistributionChartData } from "@/utils/simulation"
+import { getCurrentStats, getLevelDistributionChartData } from "@/utils/simulation"
 import { CultivatorChart, LevelDistributionChart } from "@/components/charts"
 import { SimulationStats, CultivatorCard } from "@/components/statistics"
 import { SystemLog } from "@/components/system-log"
@@ -179,7 +177,7 @@ export default function CultivationSimulator() {
                           <div className="text-sm text-muted-foreground">总修士数量</div>
                         </div>
                         {Object.entries(currentData.level_distribution)
-                          .filter(([_, count]) => count > 0)
+                          .filter(([, count]) => count > 0)
                           .map(([level, count]) => (
                             <div key={level} className="text-center p-4 rounded-lg bg-muted/50">
                               <div className="text-2xl font-bold text-primary">{count}</div>
