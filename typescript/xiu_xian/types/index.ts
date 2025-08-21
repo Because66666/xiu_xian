@@ -1,16 +1,27 @@
 // 修仙者接口
+/**
+ * 修士接口定义
+ * 描述修仙世界中每个修士的基本属性和状态
+ */
 export interface Cultivator {
+  /** 修士唯一标识符 */
   id: number
+  /** 修士当前年龄 */
   age: number
+  /** 修士当前修为点数，用于判断修炼等级和战斗力 */
   cultivation_points: number
+  /** 修士当前修炼等级（0-7，对应不同境界） */
   level: number
+  /** 修士勇气值（0-1），影响是否参与战斗的决策 */
   courage: number
+  /** 修士最大寿命，根据修炼等级确定 */
   max_lifespan: number
+  /** 修士是否存活状态 */
   is_alive: boolean
+  /** 修士击败其他修士的次数，用于确定杀戮之王 */
   defeats_count: number
-  battles_count: number
+  /** 修士出生年份，用于计算年龄和统计 */
   birth_year: number
-  start_cultivation_age: number
 }
 
 // 模拟数据接口

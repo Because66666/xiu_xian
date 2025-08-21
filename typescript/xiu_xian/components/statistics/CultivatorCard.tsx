@@ -56,10 +56,6 @@ export function CultivatorCard({ cultivator, title, titleColor, icon, borderColo
             <span className="font-medium text-red-600">{cultivator.defeats_count}</span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">战斗数:</span>
-            <span className="font-medium">{cultivator.battles_count}</span>
-          </div>
-          <div className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">胆识:</span>
             <span className="font-medium">{(cultivator.courage * 100).toFixed(1)}%</span>
           </div>

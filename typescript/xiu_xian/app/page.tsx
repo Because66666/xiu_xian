@@ -361,7 +361,7 @@ export default function CultivationSimulator() {
                                   ? (levelCultivators.reduce((sum, c) => sum + c.courage, 0) / count).toFixed(2)
                                   : '0.00';
                                 const avgBattles = count > 0
-                                  ? (levelCultivators.reduce((sum, c) => sum + c.battles_count, 0) / count).toFixed(2)
+                                  ? (levelCultivators.reduce((sum, c) => sum + c.defeats_count, 0) / count).toFixed(2)
                                   : '0.00';
                                 const avgRemainingLifespan = count > 0
                                   ? (levelCultivators.reduce((sum, c) => sum + (c.max_lifespan - c.age), 0) / count).toFixed(2)

@@ -27,13 +27,7 @@ export function useSimulation() {
     let newNextId = nextId
 
     for (let i = 0; i < CULTIVATOR_GENERATION.yearlyCount; i++) {
-      const startAge = Math.max(
-        CULTIVATOR_GENERATION.startAgeMin,
-        Math.min(
-          CULTIVATOR_GENERATION.startAgeMax,
-          Math.round(normalRandom(CULTIVATOR_GENERATION.startAgeMean, CULTIVATOR_GENERATION.startAgeStdDev))
-        )
-      )
+      const startAge = 10
       const foundationAge = startAge + CULTIVATOR_GENERATION.foundationAgeOffset
 
       cultivators.push({
@@ -49,9 +43,7 @@ export function useSimulation() {
         max_lifespan: CultivationLevels[CULTIVATOR_GENERATION.initialLevel].lifespan,
         is_alive: true,
         defeats_count: 0,
-        battles_count: 0,
-        birth_year: currentSimYear - foundationAge,
-        start_cultivation_age: startAge,
+        birth_year: currentSimYear - foundationAge
       })
     }
 
@@ -63,7 +55,7 @@ export function useSimulation() {
     return cultivators.map((c) => ({
       ...c,
       age: c.age + 1,
-      cultivation_points: c.cultivation_points + 1,
+      cultivation_points: c.cultivation_points + Math.floor(Math.random() * 10) + 1,
     }))
   }, [])
 
@@ -116,8 +108,8 @@ export function useSimulation() {
 
             if (cultivator.courage > defeatProbability) {
               yearlyBattles++
-              cultivator.battles_count++
-              opponent.battles_count++
+              cultivator.defeats_count++
+              opponent.defeats_count++
 
               if (Math.random() < winProbability) {
                 const absorbedPower = Math.floor(opponent.cultivation_points * absorptionRate)
@@ -177,7 +169,7 @@ export function useSimulation() {
         levelStats[levelName].avg_courage =
           levelCultivators.reduce((sum, c) => sum + c.courage, 0) / levelCultivators.length
         levelStats[levelName].avg_battles =
-          levelCultivators.reduce((sum, c) => sum + c.battles_count, 0) / levelCultivators.length
+          levelCultivators.reduce((sum, c) => sum + c.defeats_count, 0) / levelCultivators.length
         levelStats[levelName].avg_lifespan =
           levelCultivators.reduce((sum, c) => sum + (c.max_lifespan - c.age), 0) / levelCultivators.length
       }
