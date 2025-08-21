@@ -78,6 +78,14 @@ export interface ChartData {
   deaths?: number
 }
 
+// 轻量级历史数据接口（用于趋势图表）
+export interface HistoricalData {
+  year: number
+  total_cultivators: number
+  battles: number
+  deaths: number
+}
+
 // 等级分布图表数据接口
 export interface LevelDistributionData {
   level: string

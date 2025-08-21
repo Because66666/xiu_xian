@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
-import { Cultivator, SimulationData, SystemLog, SimulationState, SimulationParams } from '@/types'
+import { Cultivator, SimulationData, HistoricalData, SystemLog, SimulationState, SimulationParams } from '@/types'
 import { CultivationLevels, CULTIVATOR_GENERATION, BATTLE_PARAMS } from '@/constants/cultivation'
 import { normalRandom, clamp } from '@/utils/simulation'
 
@@ -10,7 +10,7 @@ export function useSimulation() {
   const [isRunning, setIsRunning] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const [currentYear, setCurrentYear] = useState(0)
-  const [simulationData, setSimulationData] = useState<SimulationData[]>([])
+  const [historicalData, setHistoricalData] = useState<HistoricalData[]>([])
   const [currentData, setCurrentData] = useState<SimulationData | null>(null)
   const [systemLogs, setSystemLogs] = useState<SystemLog[]>([])
 
@@ -20,6 +20,24 @@ export function useSimulation() {
   // 确保初代播报仅出现一次（每次运行生命周期内）
   const hasReportedInitialStrongestRef = useRef(false)
   const hasReportedInitialKillerRef = useRef(false)
+  // 追踪最强修士和杀戮之王的ID，避免保存完整数据
+  const prevStrongestIdRef = useRef<number | null>(null)
+  const prevTopKillerIdRef = useRef<number | null>(null)
+
+  // 系统日志最大数量
+  const MAX_SYSTEM_LOGS = 50
+
+  // 添加系统日志的辅助函数，自动限制数量
+  const addSystemLog = useCallback((newLog: SystemLog) => {
+    setSystemLogs(prev => {
+      const updatedLogs = [...prev, newLog]
+      // 如果超过最大数量，删除最旧的记录
+      if (updatedLogs.length > MAX_SYSTEM_LOGS) {
+        return updatedLogs.slice(-MAX_SYSTEM_LOGS)
+      }
+      return updatedLogs
+    })
+  }, [])
 
   // 创建新修士
   const createNewCultivators = useCallback((currentSimYear: number, nextId: number): { cultivators: Cultivator[], newNextId: number } => {
@@ -179,7 +197,7 @@ export function useSimulation() {
   }, [])
 
   // 追踪最强修士和杀戮之王变化
-  const trackChanges = useCallback((cultivators: Cultivator[], prevData: SimulationData | null, currentSimYear: number, battles: number, deaths: number) => {
+  const trackChanges = useCallback((cultivators: Cultivator[], currentSimYear: number, battles: number, deaths: number) => {
     const aliveCultivators = cultivators // 传入的cultivators已经是活着的修士
     if (aliveCultivators.length === 0) return
 
@@ -191,7 +209,7 @@ export function useSimulation() {
     )
 
     // 如果是第一年，记录初始状态
-    if (!prevData) {
+    if (prevStrongestIdRef.current === null) {
       setSystemLogs(prev => {
         // 检查是否已经播报过相同的初代最强修士
         const alreadyReported = prev.some(log => 
@@ -205,7 +223,8 @@ export function useSimulation() {
         }
         
         hasReportedInitialStrongestRef.current = true
-        return [...prev, {
+        prevStrongestIdRef.current = currentStrongest.id
+        addSystemLog({
           year: currentSimYear,
           type: 'strongest_change',
           message: `修仙世界开启：修士${currentStrongest.id}成为初代最强修士`,
@@ -217,7 +236,8 @@ export function useSimulation() {
             defeats_count: currentStrongest.defeats_count
           },
           reason: '修仙世界初始化'
-        }]
+        })
+        return prev
       })
       
       if (currentTopKiller.defeats_count > 0) {
@@ -234,7 +254,8 @@ export function useSimulation() {
           }
           
           hasReportedInitialKillerRef.current = true
-          return [...prev, {
+          prevTopKillerIdRef.current = currentTopKiller.id
+          addSystemLog({
             year: currentSimYear,
             type: 'killer_change',
             message: `修士${currentTopKiller.id}成为初代杀戮之王`,
@@ -246,69 +267,48 @@ export function useSimulation() {
               defeats_count: currentTopKiller.defeats_count
             },
             reason: `首次击败${currentTopKiller.defeats_count}人`
-          }]
+          })
+          return prev
         })
       }
       return
     }
 
-    const prevAliveCultivators = prevData.cultivators // prevData.cultivators已经是活着的修士
-    if (prevAliveCultivators.length === 0) return
-
-    const prevStrongest = prevAliveCultivators.reduce((strongest, current) => 
-      current.cultivation_points > strongest.cultivation_points ? current : strongest
-    )
-    const prevTopKiller = prevAliveCultivators.reduce((topKiller, current) => 
-      current.defeats_count > topKiller.defeats_count ? current : topKiller
-    )
-
     // 最强修士变化
-    if (currentStrongest.id !== prevStrongest.id) {
+    if (currentStrongest.id !== prevStrongestIdRef.current) {
       // 检查前任最强修士是否还活着
-      const prevStrongestStillAlive = aliveCultivators.find(c => c.id === prevStrongest.id)
+      const prevStrongestStillAlive = prevStrongestIdRef.current ? aliveCultivators.find(c => c.id === prevStrongestIdRef.current) : null
       let reason: string
       let message: string
       
-      if (!prevStrongestStillAlive) {
-        // 查找击杀者：找到击败人数比上一年增加的修士
-        const killer = aliveCultivators.find(c => {
-          const prevCultivator = prevAliveCultivators.find(pc => pc.id === c.id)
-          return prevCultivator && c.defeats_count > prevCultivator.defeats_count
-        })
-        
-        if (killer) {
-          const prevStrongestLevel = CultivationLevels[prevStrongest.level as keyof typeof CultivationLevels]?.name || '未知'
-          const killerLevel = CultivationLevels[killer.level as keyof typeof CultivationLevels]?.name || '未知'
-          reason = `前任最强修士（${prevStrongestLevel}期）被修士${killer.id}（${killerLevel}期）击杀`
-          message = `最强修士更迭：修士${prevStrongest.id}被修士${killer.id}击杀，修士${currentStrongest.id}继承最强之位`
-        } else {
-          const prevStrongestLevel = CultivationLevels[prevStrongest.level as keyof typeof CultivationLevels]?.name || '未知'
-          reason = `前任最强修士（${prevStrongestLevel}期）死亡（寿元耗尽）`
-          message = `最强修士更迭：修士${prevStrongest.id}寿元耗尽死亡，修士${currentStrongest.id}继承最强之位`
-        }
-      } else {
+      if (!prevStrongestStillAlive && prevStrongestIdRef.current) {
+        reason = `前任最强修士（修士${prevStrongestIdRef.current}）死亡`
+        message = `最强修士更迭：修士${prevStrongestIdRef.current}死亡，修士${currentStrongest.id}继承最强之位`
+      } else if (prevStrongestStillAlive) {
         // 前任还活着，比较修为
-        const currentPrevStrongest = aliveCultivators.find(c => c.id === prevStrongest.id)!
-        if (currentStrongest.cultivation_points > currentPrevStrongest.cultivation_points) {
-          reason = `修为严格超越前任最强修士（${currentStrongest.cultivation_points} > ${currentPrevStrongest.cultivation_points}）`
-          message = `最强修士更迭：修士${currentStrongest.id}通过修炼突破，修为超越修士${prevStrongest.id}，成为新的最强修士`
+        if (currentStrongest.cultivation_points > prevStrongestStillAlive.cultivation_points) {
+          reason = `修为严格超越前任最强修士（${currentStrongest.cultivation_points} > ${prevStrongestStillAlive.cultivation_points}）`
+          message = `最强修士更迭：修士${currentStrongest.id}通过修炼突破，修为超越修士${prevStrongestIdRef.current}，成为新的最强修士`
         } else {
           reason = `前任最强修士实力下降或其他修士实力提升`
-          message = `最强修士更迭：修士${currentStrongest.id}取代修士${prevStrongest.id}成为新的最强修士`
+          message = `最强修士更迭：修士${currentStrongest.id}取代修士${prevStrongestIdRef.current}成为新的最强修士`
         }
+      } else {
+        reason = `新的最强修士诞生`
+        message = `最强修士更迭：修士${currentStrongest.id}成为新的最强修士`
       }
       
-      setSystemLogs(prev => [...prev, {
+      addSystemLog({
         year: currentSimYear,
         type: 'strongest_change',
         message,
-        oldCultivator: {
-          id: prevStrongest.id,
-          name: `修士${prevStrongest.id}`,
-          level: CultivationLevels[prevStrongest.level as keyof typeof CultivationLevels]?.name || '未知',
-          cultivation_points: prevStrongest.cultivation_points,
-          defeats_count: prevStrongest.defeats_count
-        },
+        oldCultivator: prevStrongestIdRef.current ? {
+          id: prevStrongestIdRef.current,
+          name: `修士${prevStrongestIdRef.current}`,
+          level: prevStrongestStillAlive ? CultivationLevels[prevStrongestStillAlive.level as keyof typeof CultivationLevels]?.name || '未知' : '未知',
+          cultivation_points: prevStrongestStillAlive?.cultivation_points || 0,
+          defeats_count: prevStrongestStillAlive?.defeats_count || 0
+        } : undefined,
         newCultivator: {
           id: currentStrongest.id,
           name: `修士${currentStrongest.id}`,
@@ -317,56 +317,47 @@ export function useSimulation() {
           defeats_count: currentStrongest.defeats_count
         },
         reason
-      }])
+      })
+      
+      // 更新最强修士ID引用
+      prevStrongestIdRef.current = currentStrongest.id
     }
 
     // 杀戮之王变化 - 只有当ID真正发生变化时才播报
-    if (currentTopKiller.id !== prevTopKiller.id && currentTopKiller.defeats_count > 0) {
+    if (currentTopKiller.id !== prevTopKillerIdRef.current && currentTopKiller.defeats_count > 0) {
       // 检查前任杀戮之王是否还活着
-      const prevTopKillerStillAlive = aliveCultivators.find(c => c.id === prevTopKiller.id)
+      const prevTopKillerStillAlive = prevTopKillerIdRef.current ? aliveCultivators.find(c => c.id === prevTopKillerIdRef.current) : null
       let reason: string
       let message: string
       
-      if (!prevTopKillerStillAlive) {
-        // 查找击杀者：找到击败人数比上一年增加的修士
-        const killer = aliveCultivators.find(c => {
-          const prevCultivator = prevAliveCultivators.find(pc => pc.id === c.id)
-          return prevCultivator && c.defeats_count > prevCultivator.defeats_count
-        })
-        
-        if (killer) {
-          const prevTopKillerLevel = CultivationLevels[prevTopKiller.level as keyof typeof CultivationLevels]?.name || '未知'
-          const killerLevel = CultivationLevels[killer.level as keyof typeof CultivationLevels]?.name || '未知'
-          reason = `前任杀戮之王（${prevTopKillerLevel}期）被修士${killer.id}（${killerLevel}期）击杀`
-          message = `杀戮之王更迭：修士${prevTopKiller.id}被修士${killer.id}击杀，修士${currentTopKiller.id}继承杀戮之王之位`
-        } else {
-          const prevTopKillerLevel = CultivationLevels[prevTopKiller.level as keyof typeof CultivationLevels]?.name || '未知'
-          reason = `前任杀戮之王（${prevTopKillerLevel}期）死亡（寿元耗尽）`
-          message = `杀戮之王更迭：修士${prevTopKiller.id}寿元耗尽死亡，修士${currentTopKiller.id}继承杀戮之王之位`
-        }
-      } else {
+      if (!prevTopKillerStillAlive && prevTopKillerIdRef.current) {
+        reason = `前任杀戮之王（修士${prevTopKillerIdRef.current}）死亡`
+        message = `杀戮之王更迭：修士${prevTopKillerIdRef.current}死亡，修士${currentTopKiller.id}继承杀戮之王之位`
+      } else if (prevTopKillerStillAlive) {
         // 前任还活着，比较击败人数
-        const currentPrevTopKiller = aliveCultivators.find(c => c.id === prevTopKiller.id)!
-        if (currentTopKiller.defeats_count > currentPrevTopKiller.defeats_count) {
-          reason = `击败人数严格超越前任杀戮之王（${currentTopKiller.defeats_count} > ${currentPrevTopKiller.defeats_count}）`
-          message = `杀戮之王更迭：修士${currentTopKiller.id}通过战斗积累更多胜利，击败人数超越修士${prevTopKiller.id}，成为新的杀戮之王`
+        if (currentTopKiller.defeats_count > prevTopKillerStillAlive.defeats_count) {
+          reason = `击败人数严格超越前任杀戮之王（${currentTopKiller.defeats_count} > ${prevTopKillerStillAlive.defeats_count}）`
+          message = `杀戮之王更迭：修士${currentTopKiller.id}通过战斗积累更多胜利，击败人数超越修士${prevTopKillerIdRef.current}，成为新的杀戮之王`
         } else {
           reason = `前任杀戮之王击败人数下降或其他修士击败人数提升`
-          message = `杀戮之王更迭：修士${currentTopKiller.id}取代修士${prevTopKiller.id}成为新的杀戮之王`
+          message = `杀戮之王更迭：修士${currentTopKiller.id}取代修士${prevTopKillerIdRef.current}成为新的杀戮之王`
         }
+      } else {
+        reason = `新的杀戮之王诞生`
+        message = `杀戮之王更迭：修士${currentTopKiller.id}成为新的杀戮之王`
       }
       
-      setSystemLogs(prev => [...prev, {
+      addSystemLog({
         year: currentSimYear,
         type: 'killer_change',
         message,
-        oldCultivator: {
-          id: prevTopKiller.id,
-          name: `修士${prevTopKiller.id}`,
-          level: CultivationLevels[prevTopKiller.level as keyof typeof CultivationLevels]?.name || '未知',
-          cultivation_points: prevTopKiller.cultivation_points,
-          defeats_count: prevTopKiller.defeats_count
-        },
+        oldCultivator: prevTopKillerIdRef.current ? {
+          id: prevTopKillerIdRef.current,
+          name: `修士${prevTopKillerIdRef.current}`,
+          level: prevTopKillerStillAlive ? CultivationLevels[prevTopKillerStillAlive.level as keyof typeof CultivationLevels]?.name || '未知' : '未知',
+          cultivation_points: prevTopKillerStillAlive?.cultivation_points || 0,
+          defeats_count: prevTopKillerStillAlive?.defeats_count || 0
+        } : undefined,
         newCultivator: {
           id: currentTopKiller.id,
           name: `修士${currentTopKiller.id}`,
@@ -375,7 +366,10 @@ export function useSimulation() {
           defeats_count: currentTopKiller.defeats_count
         },
         reason
-      }])
+      })
+      
+      // 更新杀戮之王ID引用
+      prevTopKillerIdRef.current = currentTopKiller.id
     }
   }, [])
 
@@ -388,8 +382,7 @@ export function useSimulation() {
     
     // 模拟状态恢复（不再需要恢复死亡修士数据）
 
-    // 使用局部 prevDataLocal：若已有历史数据，则取最后一条；否则为 null（仅第一次年份触发初代播报）
-    let prevDataLocal: SimulationData | null = simulationData[simulationData.length - 1] || null
+
 
     for (let currentSimYear = year; currentSimYear <= simulationYears; currentSimYear++) {
       if (shouldPauseRef.current) {
@@ -425,7 +418,20 @@ export function useSimulation() {
       // 计算统计数据
       const { levelDistribution, levelStats } = calculateStats(cultivators)
 
-      const mockData: SimulationData = {
+      // 追踪变化
+      trackChanges(cultivators, currentSimYear, battleResult.battles, totalDeaths)
+      
+      // 只存储轻量级的历史数据用于图表
+      const lightweightData: HistoricalData = {
+        year: currentSimYear,
+        total_cultivators: cultivators.length,
+        battles: battleResult.battles,
+        deaths: totalDeaths
+      }
+      setHistoricalData((prev) => [...prev, lightweightData])
+
+      setCurrentYear(currentSimYear)
+      setCurrentData({
         year: currentSimYear,
         cultivators: [...cultivators],
         total_cultivators: cultivators.length,
@@ -433,18 +439,7 @@ export function useSimulation() {
         deaths: totalDeaths,
         level_distribution: levelDistribution,
         level_stats: levelStats,
-      }
-
-      // 追踪变化（使用局部 prevDataLocal，确保初代播报只在整个运行的第一年触发一次）
-      trackChanges(cultivators, prevDataLocal, currentSimYear, battleResult.battles, totalDeaths)
-      
-      setSimulationData((prev) => [...prev, mockData])
-
-      setCurrentYear(currentSimYear)
-      setCurrentData(mockData)
-
-      // 更新局部上一年数据
-      prevDataLocal = mockData
+      })
 
       simulationStateRef.current = { cultivators, nextId, year: currentSimYear + 1 }
     }
@@ -452,14 +447,13 @@ export function useSimulation() {
     setIsRunning(false)
     setIsPaused(false)
     simulationStateRef.current = null
-  }, [simulationYears, absorptionRate, simulationData, createNewCultivators, ageCultivators, updateCultivatorLevels, processBattles, calculateStats, trackChanges])
+  }, [simulationYears, absorptionRate, createNewCultivators, ageCultivators, updateCultivatorLevels, processBattles, calculateStats, trackChanges])
 
   // 开始模拟
   const runSimulation = useCallback(async () => {
     setIsRunning(true)
     setIsPaused(false)
     setCurrentYear(0)
-    setSimulationData([])
     setSystemLogs([])
     // 重置初代播报标记
     hasReportedInitialStrongestRef.current = false
@@ -497,11 +491,14 @@ export function useSimulation() {
     setSystemLogs([])
     setIsPaused(false)
     setCurrentYear(0)
-    setSimulationData([])
+    setHistoricalData([])
     setCurrentData(null)
     // 重置初代播报标记
     hasReportedInitialStrongestRef.current = false
     hasReportedInitialKillerRef.current = false
+    // 重置ID引用
+    prevStrongestIdRef.current = null
+    prevTopKillerIdRef.current = null
     simulationStateRef.current = null
   }, [])
 
@@ -514,7 +511,7 @@ export function useSimulation() {
     isRunning,
     isPaused,
     currentYear,
-    simulationData,
+    historicalData,
     currentData,
     systemLogs,
     

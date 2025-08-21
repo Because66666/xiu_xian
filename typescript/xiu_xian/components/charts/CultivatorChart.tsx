@@ -4,34 +4,14 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } fro
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { ChartData } from '@/types'
-import { useMemo } from 'react'
 
 interface CultivatorChartProps {
   data: ChartData[]
 }
 
 export function CultivatorChart({ data }: CultivatorChartProps) {
-  // 动态采样逻辑：当数据点超过60时，采样到50个点
-  const sampledData = useMemo(() => {
-    if (data.length <= 60) {
-      return data
-    }
-
-    const maxSamples = 50
-    const step = Math.floor(data.length / maxSamples)
-    const sampled: ChartData[] = []
-
-    for (let i = 0; i < data.length; i += step) {
-      sampled.push(data[i])
-    }
-
-    // 确保包含最后一个数据点
-    if (data.length > 0 && sampled[sampled.length - 1] !== data[data.length - 1]) {
-      sampled.push(data[data.length - 1])
-    }
-
-    return sampled
-  }, [data])
+  // 使用传入的数据，采样已在父组件中完成
+  const sampledData = data
 
   return (
     <Card>

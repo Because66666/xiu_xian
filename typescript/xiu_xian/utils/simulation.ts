@@ -1,4 +1,4 @@
-import { Cultivator, CurrentStats, ChartData, LevelDistributionData, SimulationData } from '@/types'
+import { Cultivator, CurrentStats, ChartData, LevelDistributionData, SimulationData, HistoricalData } from '@/types'
 import { CultivationLevels, HighestRealmNames } from '@/constants/cultivation'
 
 /**
@@ -91,19 +91,19 @@ export function getCurrentStats(currentData: SimulationData | null): CurrentStat
  * @param maxSamples 最大采样数量
  * @returns 采样后的图表数据
  */
-export function getSampledChartData(simulationData: SimulationData[], maxSamples: number = 50): ChartData[] {
-  if (simulationData.length <= maxSamples) {
-    return simulationData.map((data) => ({
+export function getSampledChartData(historicalData: HistoricalData[], maxSamples: number = 50): ChartData[] {
+  if (historicalData.length <= maxSamples) {
+    return historicalData.map((data) => ({
       year: data.year,
       cultivators: data.total_cultivators,
     }))
   }
 
-  const step = Math.floor(simulationData.length / maxSamples)
+  const step = Math.floor(historicalData.length / maxSamples)
   const sampledData: ChartData[] = []
 
-  for (let i = 0; i < simulationData.length; i += step) {
-    const data = simulationData[i]
+  for (let i = 0; i < historicalData.length; i += step) {
+    const data = historicalData[i]
     sampledData.push({
       year: data.year,
       cultivators: data.total_cultivators,
@@ -111,8 +111,8 @@ export function getSampledChartData(simulationData: SimulationData[], maxSamples
   }
 
   // 确保包含最后一个数据点
-  if (simulationData.length > 0) {
-    const lastData = simulationData[simulationData.length - 1]
+  if (historicalData.length > 0) {
+    const lastData = historicalData[historicalData.length - 1]
     if (sampledData[sampledData.length - 1]?.year !== lastData.year) {
       sampledData.push({
         year: lastData.year,

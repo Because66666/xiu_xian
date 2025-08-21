@@ -9,8 +9,8 @@ import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Play, Pause, RotateCcw, Sword, Crown, TrendingUp, Github } from "lucide-react"
 import { useSimulation } from "@/hooks/useSimulation"
-import { CultivationLevels } from "@/constants/cultivation"
-import { getCurrentStats, getLevelDistributionChartData } from "@/utils/simulation"
+import { CultivationLevels, CULTIVATOR_GENERATION } from "@/constants/cultivation"
+import { getCurrentStats, getSampledChartData, getLevelDistributionChartData } from "@/utils/simulation"
 import { CultivatorChart, LevelDistributionChart } from "@/components/charts"
 import { SimulationStats, CultivatorCard } from "@/components/statistics"
 import { SystemLog } from "@/components/system-log"
@@ -24,7 +24,7 @@ export default function CultivationSimulator() {
     isRunning,
     isPaused,
     currentYear,
-    simulationData,
+    historicalData,
     currentData,
     systemLogs,
     runSimulation,
@@ -43,10 +43,7 @@ export default function CultivationSimulator() {
   ) : null
 
   // 图表数据
-  const chartData = simulationData.map((data) => ({
-    year: data.year,
-    cultivators: data.total_cultivators,
-  }))
+  const chartData = getSampledChartData(historicalData)
   const levelDistributionChartData = getLevelDistributionChartData(currentData)
 
   return (
@@ -268,7 +265,7 @@ export default function CultivationSimulator() {
           </TabsContent>
 
           <TabsContent value="statistics" className="space-y-6">
-            {simulationData.length > 0 && (
+            {historicalData.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card>
                   <CardHeader>
@@ -277,12 +274,12 @@ export default function CultivationSimulator() {
                   <CardContent className="space-y-4">
                     <div className="flex justify-between">
                       <span>总模拟年数:</span>
-                      <span className="font-bold">{simulationData.length} 年</span>
+                      <span className="font-bold">{historicalData.length} 年</span>
                     </div>
                     <div className="flex justify-between">
                       <span>总战斗次数:</span>
                       <span className="font-bold">
-                        {simulationData.reduce((sum, data) => sum + data.battles, 0)} 次
+                        {historicalData.reduce((sum, data) => sum + data.battles, 0)} 次
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -306,7 +303,7 @@ export default function CultivationSimulator() {
                     <div className="flex justify-between">
                       <span>平均每年战斗:</span>
                       <span className="font-bold">
-                        {(simulationData.reduce((sum, data) => sum + data.battles, 0) / simulationData.length).toFixed(
+                        {(historicalData.reduce((sum, data) => sum + data.battles, 0) / historicalData.length).toFixed(
                           1,
                         )}{" "}
                         次
@@ -317,16 +314,20 @@ export default function CultivationSimulator() {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>修为吸取设置</CardTitle>
+                    <CardTitle>模拟参数</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex justify-between">
-                      <span>吸取比率:</span>
+                      <span>修为吸取比率:</span>
                       <span className="font-bold">{(absorptionRate * 100).toFixed(1)}%</span>
                     </div>
+                    <div className="flex justify-between">
+                      <span>每年新增筑基修士:</span>
+                      <span className="font-bold">{CULTIVATOR_GENERATION.yearlyCount}</span>
+                    </div>
                     <div className="text-sm text-muted-foreground">
-                      <p>每次战斗胜利后，胜者将吸收败者 {(absorptionRate * 100).toFixed(1)}% 的修为点数。</p>
-                      <p className="mt-2">这个机制促进了修仙界的竞争与成长，强者愈强，弱者淘汰。</p>
+                      <p>· 每次战斗胜利后，胜者将吸收败者 {(absorptionRate * 100).toFixed(1)}% 的修为点数。</p>
+                      <p className="mt-2">· 这个机制促进了修仙界的竞争与成长，强者愈强，弱者淘汰。</p>
                     </div>
                   </CardContent>
                 </Card>
